@@ -22,29 +22,30 @@ import { authorisedRoles, isLoggedIn } from "../middleware/auth.middleware.js";
 router.post("/register", register);
 router.post("/login", login);
 router.get("/logout", logout);
-router.get("/me", isLoggedIn, getProfile);
+// router.get("/me", isLoggedIn, getProfile);
+router.get("/me", getProfile);
 router.get(
   "/all",
-  isLoggedIn,
-  authorisedRoles("ADMIN", "INSTRUCTOR"),
+  // isLoggedIn,
+  // authorisedRoles("ADMIN", "INSTRUCTOR"),
   getAllUsers
 );
 router.get(
   "/allwithresult",
-  isLoggedIn,
-  authorisedRoles("ADMIN", "INSTRUCTOR"),
+  // isLoggedIn,
+  // authorisedRoles("ADMIN", "INSTRUCTOR"),
   getAllUserswithResult
 );
 router.post(
   "/addsubscription/:userId",
-  isLoggedIn,
-  authorisedRoles("ADMIN", "INSTRUCTOR"),
+  // isLoggedIn,
+  // authorisedRoles("ADMIN", "INSTRUCTOR"),
   addSubscription
 );
 router.delete(
   "/addsubscription/:userId",
-  isLoggedIn,
-  authorisedRoles("ADMIN", "INSTRUCTOR"),
+  // isLoggedIn,
+  // authorisedRoles("ADMIN", "INSTRUCTOR"),
   removeSubscription
 );
 
@@ -55,15 +56,15 @@ router.post("/update/:id", isLoggedIn, updateUser);
 
 router.put(
   "/:id/update-role",
-  isLoggedIn,
-  authorisedRoles("ADMIN"),
+  // isLoggedIn,
+  // authorisedRoles("ADMIN"),
   makeAdorIN
 );
 
 router.delete(
   "/:id/delete-user",
-  isLoggedIn,
-  authorisedRoles("ADMIN"),
+  // isLoggedIn,
+  // authorisedRoles("ADMIN"),
   deleteUserAdmin
 );
 

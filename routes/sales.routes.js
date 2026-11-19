@@ -13,7 +13,7 @@ import {
 
 const router = Router();
 
-router.use(isLoggedIn, authorisedRoles("ADMIN"));
+// router.use(isLoggedIn, authorisedRoles("ADMIN"));
 
 router.post("/create", createSale);
 router.get("/all", getAllSales);
