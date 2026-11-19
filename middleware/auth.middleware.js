@@ -60,11 +60,13 @@ import userModel from "../models/user.model.js";
 
 const isLoggedIn = async (req, res, next) => {
   try {
-    const token =
-      req.cookies?.token ||
-      (req.headers.authorization?.startsWith("Bearer ")
-        ? req.headers.authorization.split(" ")[1]
-        : null);
+    const authHeader = req.headers.authorization;
+    const bearerToken =
+      authHeader && /^Bearer\s+/i.test(authHeader)
+        ? authHeader.replace(/^Bearer\s+/i, "").trim()
+        : null;
+
+    const token = req.cookies?.token || bearerToken;
 
     if (!token) {
       return next(new AppError("Unauthenticated, please login again", 401));
