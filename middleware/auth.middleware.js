@@ -11,6 +11,8 @@ const isLoggedIn = async (req, res, next) => {
     // Get token from cookies
     const token = req.cookies?.token;
 
+    console.log(token)
+
     // Debug logs
     console.log("Request URL:", req.originalUrl);
     console.log("Cookie received:", Boolean(token));

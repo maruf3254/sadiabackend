@@ -10,6 +10,6 @@ const router = Router();
 
 // router.use(isLoggedIn, authorisedRoles("ADMIN"));
 
-router.get("/overview", getDashboardOverview);
+router.get("/overview", isLoggedIn, getDashboardOverview);
 
 export default router;
