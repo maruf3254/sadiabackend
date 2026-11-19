@@ -6,35 +6,72 @@ import userModel from "../models/user.model.js";
 // ===============================
 // Authentication Middleware
 // ===============================
+// const isLoggedIn = async (req, res, next) => {
+//   try {
+//     // Get token from cookies
+//     const token = req.cookies?.token;
+
+
+
+//     console.log(token)
+
+//     // Debug logs
+//     console.log("Request URL:", req.originalUrl);
+//     console.log("Cookie received:", Boolean(token));
+
+//     // Check token
+//     if (!token) {
+//       return next(
+//         new AppError("Unauthenticated, please login againnnn", 401)
+//       );
+//     }
+
+//     // Verify JWT
+//     const userDetails = jwt.verify(
+//       token,
+//       process.env.JWT_SECRET
+//     );
+
+//     // Attach user details
+//     req.user = userDetails;
+
+//     next();
+//   } catch (error) {
+//     console.error("Authentication Error:", error.message);
+
+//     if (error.name === "TokenExpiredError") {
+//       return next(
+//         new AppError("Session expired, please login again", 401)
+//       );
+//     }
+
+//     if (error.name === "JsonWebTokenError") {
+//       return next(
+//         new AppError("Invalid token, please login again", 401)
+//       );
+//     }
+
+//     return next(
+//       new AppError("Authentication failed", 401)
+//     );
+//   }
+// };
+
+
 const isLoggedIn = async (req, res, next) => {
   try {
-    // Get token from cookies
-    const token = req.cookies?.token;
+    const token =
+      req.cookies?.token ||
+      (req.headers.authorization?.startsWith("Bearer ")
+        ? req.headers.authorization.split(" ")[1]
+        : null);
 
-
-
-    console.log(token)
-
-    // Debug logs
-    console.log("Request URL:", req.originalUrl);
-    console.log("Cookie received:", Boolean(token));
-
-    // Check token
     if (!token) {
-      return next(
-        new AppError("Unauthenticated, please login againnnn", 401)
-      );
+      return next(new AppError("Unauthenticated, please login again", 401));
     }
 
-    // Verify JWT
-    const userDetails = jwt.verify(
-      token,
-      process.env.JWT_SECRET
-    );
-
-    // Attach user details
+    const userDetails = jwt.verify(token, process.env.JWT_SECRET);
     req.user = userDetails;
-
     next();
   } catch (error) {
     console.error("Authentication Error:", error.message);

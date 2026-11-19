@@ -10,6 +10,7 @@ const cookieOptions = {
   maxAge: 365 * 24 * 60 * 60 * 1000, // 365 days
   secure: true,
   sameSite: "none",
+  path: "/",
 };
 
 // Register
@@ -55,6 +56,7 @@ const register = async (req, res, next) => {
       success: true,
       message: "User registered successfully",
       user,
+      token
     });
   } catch (e) {
     return next(new AppError(e.message, 500));
@@ -87,6 +89,7 @@ const login = async (req, res, next) => {
       success: true,
       message: "User loggedin successfully",
       user,
+      token
     });
   } catch (e) {
     return next(new AppError(e.message, 500));
