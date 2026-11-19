@@ -16,6 +16,8 @@ const router = Router();
 
 // router.use(isLoggedIn, authorisedRoles("ADMIN"));
 
+router.use(isLoggedIn);
+
 router.get("/profit-loss", getProfitLossReport);
 router.get("/sales", getSalesReport);
 router.get("/purchases", getPurchaseReport);

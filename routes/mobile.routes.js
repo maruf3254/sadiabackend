@@ -14,6 +14,7 @@ import {
 const router = Router();
 
 // router.use(isLoggedIn, authorisedRoles("ADMIN"));
+router.use(isLoggedIn);
 
 router.get("/all", getAllMobiles);
 router.get("/:id", getSingleMobile);

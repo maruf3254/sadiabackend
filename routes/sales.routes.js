@@ -15,6 +15,8 @@ const router = Router();
 
 // router.use(isLoggedIn, authorisedRoles("ADMIN"));
 
+router.use(isLoggedIn);
+
 router.post("/create", createSale);
 router.get("/all", getAllSales);
 router.get("/:id", getSingleSale);
