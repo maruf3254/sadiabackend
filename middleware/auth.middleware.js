@@ -11,6 +11,8 @@ const isLoggedIn = async (req, res, next) => {
     // Get token from cookies
     const token = req.cookies?.token;
 
+
+
     console.log(token)
 
     // Debug logs
@@ -20,7 +22,7 @@ const isLoggedIn = async (req, res, next) => {
     // Check token
     if (!token) {
       return next(
-        new AppError("Unauthenticated, please login again", 401)
+        new AppError("Unauthenticated, please login againnnn", 401)
       );
     }
 
