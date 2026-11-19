@@ -4,67 +4,79 @@ import Sale from "../models/sales.model.js";
 import Purchase from "../models/purchase.model.js";
 import Expense from "../models/expense.model.js";
 
-// Bangladesh timezone
 const TIME_ZONE = "Asia/Dhaka";
+const BD_OFFSET = 6 * 60 * 60 * 1000;
 
-// Get start and end of a period
 const getPeriod = (start, end) => ({
   $gte: start,
   $lte: end,
 });
 
-// Get current date parts in Bangladesh timezone
+// Bangladesh date parts
 const getDhakaDateParts = (date = new Date()) => {
-  const parts = new Intl.DateTimeFormat("en-CA", {
+  const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: TIME_ZONE,
     year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
+    month: "numeric",
+    day: "numeric",
   }).formatToParts(date);
 
-  const values = {};
+  const result = {};
 
-  parts.forEach((part) => {
+  for (const part of parts) {
     if (part.type !== "literal") {
-      values[part.type] = Number(part.value);
+      result[part.type] = Number(part.value);
     }
-  });
+  }
 
-  return values;
+  return {
+    year: result.year,
+    month: result.month,
+    day: result.day,
+  };
 };
 
-// Convert Bangladesh local date/time into UTC Date
-const dhakaDateToUTC = (year, month, day, hour = 0, minute = 0, second = 0, ms = 0) => {
-  const utcValue = Date.UTC(
-    year,
-    month - 1,
-    day,
-    hour,
-    minute,
-    second,
-    ms
+// Convert Bangladesh local date to UTC
+const dhakaDateToUTC = (
+  year,
+  month,
+  day,
+  hour = 0,
+  minute = 0,
+  second = 0,
+  millisecond = 0
+) => {
+  return new Date(
+    Date.UTC(
+      year,
+      month - 1,
+      day,
+      hour,
+      minute,
+      second,
+      millisecond
+    ) - BD_OFFSET
   );
-
-  // Bangladesh is UTC+6
-  return new Date(utcValue - 6 * 60 * 60 * 1000);
 };
 
-// Get current Bangladesh date boundaries
+// Get current Bangladesh date periods
 const getBangladeshPeriods = () => {
   const now = new Date();
   const { year, month, day } = getDhakaDateParts(now);
 
   const todayStart = dhakaDateToUTC(year, month, day);
-  const todayEnd = dhakaDateToUTC(year, month, day + 1, 0, 0, 0, 0);
-  todayEnd.setMilliseconds(todayEnd.getMilliseconds() - 1);
+
+  const todayEnd = new Date(
+    dhakaDateToUTC(year, month, day + 1).getTime() - 1
+  );
 
   const monthStart = dhakaDateToUTC(year, month, 1);
 
-  const nextMonthStart = month === 12
-    ? dhakaDateToUTC(year + 1, 1, 1)
-    : dhakaDateToUTC(year, month + 1, 1);
+  const monthEnd = new Date(
+    dhakaDateToUTC(year, month + 1, 1).getTime() - 1
+  );
 
-  const monthEnd = new Date(nextMonthStart.getTime() - 1);
+  const yearStart = dhakaDateToUTC(year, 1, 1);
 
   const daysInMonth = new Date(year, month, 0).getDate();
 
@@ -72,36 +84,17 @@ const getBangladeshPeriods = () => {
     now,
     year,
     month,
+    day,
     todayStart,
     todayEnd,
     monthStart,
     monthEnd,
+    yearStart,
     daysInMonth,
   };
 };
 
-// Get Bangladesh hour
-const getDhakaHour = (date) => {
-  return Number(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: TIME_ZONE,
-      hour: "2-digit",
-      hourCycle: "h23",
-    }).format(date)
-  );
-};
-
-// Get Bangladesh day of month
-const getDhakaDay = (date) => {
-  return Number(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: TIME_ZONE,
-      day: "2-digit",
-    }).format(date)
-  );
-};
-
-// Calculate actual sales after returned items
+// Calculate sales
 const calculateSales = async (filter = {}) => {
   const sales = await Sale.find(filter).lean();
 
@@ -117,13 +110,13 @@ const calculateSales = async (filter = {}) => {
 
     for (const item of sale.items || []) {
       if (!returnedImeis.has(item.imei)) {
-        revenue += item.netAmount || 0;
-        cost += item.purchasePrice || 0;
+        revenue += Number(item.netAmount || 0);
+        cost += Number(item.purchasePrice || 0);
         quantity++;
       }
     }
 
-    refunded += sale.refundedAmount || 0;
+    refunded += Number(sale.refundedAmount || 0);
   }
 
   return {
@@ -136,94 +129,91 @@ const calculateSales = async (filter = {}) => {
   };
 };
 
-// Calculate chart sales metrics
-const calculateChartSales = (sales) => {
-  let revenue = 0;
-  let cost = 0;
+// Build current year monthly chart
+const buildYearlyChart = (sales, expenses, year) => {
+  const months = Array.from({ length: 12 }, (_, index) => ({
+    month: index,
+    label: new Date(year, index, 1).toLocaleString("en-US", {
+      month: "short",
+    }),
+    revenue: 0,
+    cost: 0,
+    grossProfit: 0,
+    expenses: 0,
+    netProfit: 0,
+  }));
 
+  // Sales
   for (const sale of sales) {
+    const monthIndex = new Date(sale.saleDate).getMonth();
+
+    if (monthIndex < 0 || monthIndex > 11) continue;
+
     const returnedImeis = new Set(
       (sale.returnedItems || []).map((item) => item.imei)
     );
 
     for (const item of sale.items || []) {
       if (!returnedImeis.has(item.imei)) {
-        revenue += item.netAmount || 0;
-        cost += item.purchasePrice || 0;
+        months[monthIndex].revenue += Number(item.netAmount || 0);
+        months[monthIndex].cost += Number(item.purchasePrice || 0);
       }
     }
   }
 
+  // Expenses
+  for (const expense of expenses) {
+    const monthIndex = new Date(expense.expenseDate).getMonth();
+
+    if (monthIndex >= 0 && monthIndex <= 11) {
+      months[monthIndex].expenses += Number(expense.amount || 0);
+    }
+  }
+
+  // Profit
+  for (const month of months) {
+    month.grossProfit = month.revenue - month.cost;
+    month.netProfit = month.grossProfit - month.expenses;
+  }
+
+  return months;
+};
+
+// Build current month pie chart
+const buildMonthlyPie = (monthlySales, monthlyExpense) => {
+  const grossProfit = monthlySales.grossProfit || 0;
+  const netProfit = grossProfit - monthlyExpense;
+
   return {
-    revenue,
-    grossProfit: revenue - cost,
+    data: [
+      {
+        name: "Cost",
+        value: monthlySales.cost || 0,
+      },
+      {
+        name: "Expenses",
+        value: monthlyExpense || 0,
+      },
+      {
+        name: "Net Profit",
+        value: Math.max(0, netProfit),
+      },
+    ],
+    netLoss: Math.max(0, -netProfit),
+    revenue: monthlySales.revenue || 0,
   };
 };
 
-// Build daily and monthly chart data
-const buildChartData = (sales, expenses, type, daysInMonth = 31) => {
-  const count = type === "hour" ? 24 : daysInMonth;
-
-  const chart = Array.from({ length: count }, (_, index) => ({
-    label:
-      type === "hour"
-        ? `${String(index).padStart(2, "0")}:00`
-        : String(index + 1),
-
-    revenue: 0,
-    grossProfit: 0,
-    expenses: 0,
-    netProfit: 0,
-  }));
-
-  // Process sales
-  for (const sale of sales) {
-    const date = new Date(sale.saleDate);
-
-    const index =
-      type === "hour"
-        ? getDhakaHour(date)
-        : getDhakaDay(date) - 1;
-
-    if (index < 0 || index >= count) continue;
-
-    const metrics = calculateChartSales([sale]);
-
-    chart[index].revenue += metrics.revenue;
-    chart[index].grossProfit += metrics.grossProfit;
-  }
-
-  // Process expenses
-  for (const expense of expenses) {
-    const date = new Date(expense.expenseDate);
-
-    const index =
-      type === "hour"
-        ? getDhakaHour(date)
-        : getDhakaDay(date) - 1;
-
-    if (index < 0 || index >= count) continue;
-
-    chart[index].expenses += expense.amount || 0;
-  }
-
-  // Calculate net profit
-  for (const item of chart) {
-    item.netProfit = item.grossProfit - item.expenses;
-  }
-
-  return chart;
-};
-
-// Dashboard Overview Controller
 export const getDashboardOverview = async (req, res, next) => {
   try {
     const {
+      now,
+      year,
       todayStart,
       todayEnd,
       monthStart,
       monthEnd,
-      daysInMonth,
+      yearStart,
     } = getBangladeshPeriods();
 
     const [
@@ -244,11 +234,8 @@ export const getDashboardOverview = async (req, res, next) => {
       recentSales,
       lowStock,
 
-      dailyChartSales,
-      dailyChartExpenses,
-
-      monthlyChartSales,
-      monthlyChartExpenses,
+      yearlySales,
+      yearlyExpenses,
     ] = await Promise.all([
       // Inventory
       Mobile.countDocuments(),
@@ -366,7 +353,7 @@ export const getDashboardOverview = async (req, res, next) => {
         .limit(5)
         .lean(),
 
-      // Lowest stock models
+      // Low stock
       Mobile.aggregate([
         {
           $match: {
@@ -394,54 +381,45 @@ export const getDashboardOverview = async (req, res, next) => {
         },
       ]),
 
-      // Daily chart sales
+      // Current year's sales
       Sale.find({
-        saleDate: getPeriod(todayStart, todayEnd),
+        saleDate: getPeriod(yearStart, now),
       }).lean(),
 
-      // Daily chart expenses
+      // Current year's expenses
       Expense.find({
-        expenseDate: getPeriod(todayStart, todayEnd),
-      }).lean(),
-
-      // Monthly chart sales
-      Sale.find({
-        saleDate: getPeriod(monthStart, monthEnd),
-      }).lean(),
-
-      // Monthly chart expenses
-      Expense.find({
-        expenseDate: getPeriod(monthStart, monthEnd),
+        expenseDate: getPeriod(yearStart, now),
       }).lean(),
     ]);
 
-    // Expenses
+    // Expense totals
     const todayExpense = todayExpenses[0]?.total || 0;
     const monthlyExpense = monthlyExpenses[0]?.total || 0;
 
     // Profit
-    const todayGrossProfit = todaySales.grossProfit;
-    const monthlyGrossProfit = monthlySales.grossProfit;
+    const todayNetProfit =
+      todaySales.grossProfit - todayExpense;
 
-    // Charts
-    const dailyChart = buildChartData(
-      dailyChartSales,
-      dailyChartExpenses,
-      "hour"
+    const monthlyNetProfit =
+      monthlySales.grossProfit - monthlyExpense;
+
+    // Yearly chart
+    const yearlyChart = buildYearlyChart(
+      yearlySales,
+      yearlyExpenses,
+      year
     );
 
-    const monthlyChart = buildChartData(
-      monthlyChartSales,
-      monthlyChartExpenses,
-      "day",
-      daysInMonth
+    // Monthly pie chart
+    const monthlyPie = buildMonthlyPie(
+      monthlySales,
+      monthlyExpense
     );
 
     // Response
     res.status(200).json({
       success: true,
 
-      // Inventory
       inventory: {
         totalMobiles,
         availableMobiles,
@@ -454,42 +432,26 @@ export const getDashboardOverview = async (req, res, next) => {
           inventoryValue[0]?.potentialSellingValue || 0,
       },
 
-      // Today's business
       today: {
         ...todaySales,
-
         expenses: todayExpense,
-
-        netProfit:
-          todayGrossProfit - todayExpense,
-
-        purchases:
-          todayPurchases[0]?.total || 0,
+        netProfit: todayNetProfit,
+        purchases: todayPurchases[0]?.total || 0,
       },
 
-      // Monthly business
       monthly: {
         ...monthlySales,
-
         expenses: monthlyExpense,
-
-        netProfit:
-          monthlyGrossProfit - monthlyExpense,
-
-        purchases:
-          monthlyPurchases[0]?.total || 0,
+        netProfit: monthlyNetProfit,
+        purchases: monthlyPurchases[0]?.total || 0,
       },
 
-      // Daily hourly chart
-      dailyChart,
+      charts: {
+        monthlyPie,
+        yearlyChart,
+      },
 
-      // Monthly daily chart
-      monthlyChart,
-
-      // Recent sales
       recentSales,
-
-      // Low stock
       lowStock,
     });
   } catch (error) {
